@@ -1,38 +1,40 @@
-#!/usr/bin/env python3
-"""game_of_life - Conway's Game of Life in the terminal."""
-import sys, time, random, os
+import argparse, random, time, sys, os
 
-def create_grid(w, h, density=0.3):
-    return [[random.random() < density for _ in range(w)] for _ in range(h)]
+def make_grid(w, h, density=0.3, seed=None):
+    if seed: random.seed(seed)
+    return [[1 if random.random() < density else 0 for _ in range(w)] for _ in range(h)]
 
 def step(grid):
     h, w = len(grid), len(grid[0])
-    new = [[False]*w for _ in range(h)]
-    for r in range(h):
-        for c in range(w):
-            n = sum(grid[(r+dr)%h][(c+dc)%w] for dr in (-1,0,1) for dc in (-1,0,1) if dr or dc)
-            new[r][c] = n == 3 or (grid[r][c] and n == 2)
+    new = [[0]*w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            n = sum(grid[(y+dy)%h][(x+dx)%w] for dy in (-1,0,1) for dx in (-1,0,1)) - grid[y][x]
+            if grid[y][x]: new[y][x] = 1 if n in (2,3) else 0
+            else: new[y][x] = 1 if n == 3 else 0
     return new
 
-def render(grid):
-    return '\n'.join(''.join('██' if c else '  ' for c in row) for row in grid)
-
-def count(grid):
-    return sum(sum(row) for row in grid)
+def display(grid, alive="█", dead=" "):
+    return "\n".join("".join(alive if c else dead for c in row) for row in grid)
 
 def main():
-    args = sys.argv[1:]
-    w = int(args[0]) if args and args[0].isdigit() else 40
-    h = int(args[1]) if len(args)>1 and args[1].isdigit() else 20
-    gens = int(args[args.index('-g')+1]) if '-g' in args else 100
-    delay = float(args[args.index('-d')+1]) if '-d' in args else 0.1
-    if '--seed' in args: random.seed(int(args[args.index('--seed')+1]))
-    grid = create_grid(w, h)
-    for gen in range(gens):
-        os.system('clear' if os.name != 'nt' else 'cls')
-        print(f"Generation {gen+1} | Alive: {count(grid)}")
-        print(render(grid))
+    p = argparse.ArgumentParser(description="Game of Life")
+    p.add_argument("-w", "--width", type=int, default=40)
+    p.add_argument("-H", "--height", type=int, default=20)
+    p.add_argument("-g", "--generations", type=int, default=100)
+    p.add_argument("-d", "--density", type=float, default=0.3)
+    p.add_argument("--seed", type=int)
+    p.add_argument("--delay", type=float, default=0.1)
+    args = p.parse_args()
+    grid = make_grid(args.width, args.height, args.density, args.seed)
+    for gen in range(args.generations):
+        sys.stdout.write(f"\033[H\033[J")
+        print(f"Generation {gen}")
+        print(display(grid))
+        alive = sum(sum(row) for row in grid)
+        print(f"Alive: {alive}")
         grid = step(grid)
-        time.sleep(delay)
+        time.sleep(args.delay)
 
-if __name__ == '__main__': main()
+if __name__ == "__main__":
+    main()

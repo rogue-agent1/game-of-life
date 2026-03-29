@@ -1,7 +1,9 @@
 # game-of-life
-Conway's Game of Life in the terminal. Zero dependencies.
+
+Conway's Game of Life simulator. Zero-dependency, single-file Python CLI.
+
 ## Usage
-```
-python3 game_of_life.py 40 20 -g 200 -d 0.05
-python3 game_of_life.py --seed 42
+
+```bash
+python3 game_of_life.py --help
 ```
