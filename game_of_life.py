@@ -1,40 +1,66 @@
-import argparse, random, time, sys, os
-
-def make_grid(w, h, density=0.3, seed=None):
-    if seed: random.seed(seed)
-    return [[1 if random.random() < density else 0 for _ in range(w)] for _ in range(h)]
+#!/usr/bin/env python3
+"""Conway's Game of Life simulator."""
+import sys
 
 def step(grid):
-    h, w = len(grid), len(grid[0])
-    new = [[0]*w for _ in range(h)]
-    for y in range(h):
-        for x in range(w):
-            n = sum(grid[(y+dy)%h][(x+dx)%w] for dy in (-1,0,1) for dx in (-1,0,1)) - grid[y][x]
-            if grid[y][x]: new[y][x] = 1 if n in (2,3) else 0
-            else: new[y][x] = 1 if n == 3 else 0
+    rows, cols = len(grid), len(grid[0])
+    new = [[0]*cols for _ in range(rows)]
+    for r in range(rows):
+        for c in range(cols):
+            n = sum(grid[(r+dr)%rows][(c+dc)%cols]
+                    for dr in (-1,0,1) for dc in (-1,0,1) if (dr,dc) != (0,0))
+            if grid[r][c]:
+                new[r][c] = 1 if n in (2, 3) else 0
+            else:
+                new[r][c] = 1 if n == 3 else 0
     return new
 
-def display(grid, alive="█", dead=" "):
-    return "\n".join("".join(alive if c else dead for c in row) for row in grid)
-
-def main():
-    p = argparse.ArgumentParser(description="Game of Life")
-    p.add_argument("-w", "--width", type=int, default=40)
-    p.add_argument("-H", "--height", type=int, default=20)
-    p.add_argument("-g", "--generations", type=int, default=100)
-    p.add_argument("-d", "--density", type=float, default=0.3)
-    p.add_argument("--seed", type=int)
-    p.add_argument("--delay", type=float, default=0.1)
-    args = p.parse_args()
-    grid = make_grid(args.width, args.height, args.density, args.seed)
-    for gen in range(args.generations):
-        sys.stdout.write(f"\033[H\033[J")
-        print(f"Generation {gen}")
-        print(display(grid))
-        alive = sum(sum(row) for row in grid)
-        print(f"Alive: {alive}")
+def run(grid, steps):
+    history = [grid]
+    for _ in range(steps):
         grid = step(grid)
-        time.sleep(args.delay)
+        history.append(grid)
+    return history
+
+def from_pattern(pattern, rows=20, cols=20, offset=(5,5)):
+    grid = [[0]*cols for _ in range(rows)]
+    for r, row in enumerate(pattern):
+        for c, ch in enumerate(row):
+            if ch in ("O", "1", "#"):
+                grid[offset[0]+r][offset[1]+c] = 1
+    return grid
+
+def population(grid):
+    return sum(sum(row) for row in grid)
+
+def to_string(grid):
+    return chr(10).join("".join("#" if c else "." for c in row) for row in grid)
+
+GLIDER = ["OOO", "O..", ".O."]
+BLINKER = ["OOO"]
+BLOCK = ["OO", "OO"]
+
+def test():
+    # Blinker oscillates
+    g = from_pattern(BLINKER, 5, 5, (2, 1))
+    g2 = step(g)
+    assert g2[1][2] == 1 and g2[2][2] == 1 and g2[3][2] == 1  # vertical
+    g3 = step(g2)
+    assert g3[2][1] == 1 and g3[2][2] == 1 and g3[2][3] == 1  # horizontal again
+    # Block is still life
+    g = from_pattern(BLOCK, 5, 5, (1, 1))
+    g2 = step(g)
+    assert g == g2
+    # Glider moves
+    g = from_pattern(GLIDER, 10, 10, (0, 0))
+    pop0 = population(g)
+    h = run(g, 4)
+    assert population(h[4]) == pop0  # glider preserves population
+    print("  game_of_life: ALL TESTS PASSED")
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "test": test()
+    else:
+        g = from_pattern(GLIDER)
+        for i, state in enumerate(run(g, 5)):
+            print(f"Step {i}:"); print(to_string(state)); print()
